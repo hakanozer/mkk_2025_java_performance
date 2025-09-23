@@ -18,10 +18,13 @@ public class UserService {
     String name = "";
 
     public Customer save(Customer user) {
+        userRepository.save(user);
+        return user;
+        /*
         for (int i = 0; i < 1000; i++) {
             //list.get(0).put("id"+i, i);
         }
-        userRepository.save(user);
+
         //list.get(0).clear();
         String data = "";
         for (int i = 0; i < 1000; i++) {
@@ -48,8 +51,7 @@ public class UserService {
             });
         long end = System.currentTimeMillis();
         System.out.println(end - start);
-
-        return user;
+        */
     }
 
     public List<Customer> findAll() {
@@ -57,9 +59,8 @@ public class UserService {
         return userRepository.findAll();
     }
 
- // stream -> 103708
+    // stream -> 103708
     // paralel Stream -> 8075
-
     public List<Customer> result() {
         List<Customer> users = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {

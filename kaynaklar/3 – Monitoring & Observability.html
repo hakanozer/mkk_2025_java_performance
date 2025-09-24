@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Optimized Java Development - Bölüm 3: Monitoring & Observability</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-left: 5px solid #3498db;
+            margin-top: 30px;
+        }
+        .slide-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .highlight {
+            background-color: #fffde7;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 15px 0;
+        }
+        .performance-impact {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-left: 4px solid #4caf50;
+            margin: 15px 0;
+        }
+        .before-after {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .before, .after {
+            flex: 1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .before {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .after {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 15px 0;
+        }
+        ul, ol {
+            padding-left: 20px;
+        }
+        .demo-step {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .note {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ff9800;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Performance Optimized Java Development - Bölüm 3: Monitoring & Observability</h1>
+
+    <div class="slide-section">
+        <h2>Monitoring vs Observability Farkı</h2>
+        
+        <div class="highlight">
+            <strong>ÖNEMLİ VURGU:</strong> Monitoring, sistemde önceden tanımlanmış metriklerin izlenmesidir. Observability ise sistemin iç durumunu dışarıdan gözlemlenebilir hale getirerek, beklenmedik sorunların kök nedenlerinin anlaşılabilmesini sağlar.
+        </div>
+
+        <div class="performance-impact">
+            <strong>PERFORMANS ETKİSİ:</strong> Sadece monitoring ile çalışan sistemlerde performans sorunlarının kök nedeni belirsiz kalabilir ve çözüm süresi uzar. Observability ile donatılmış sistemlerde ise anlık olarak performans bozukluklarının nedeni tespit edilebilir, bu da Mean Time To Resolution (MTTR) süresini düşürür ve sistem performansını uzun vadede artırır.
+        </div>
+
+        <div class="before-after">
+            <div class="before">
+                <h3>ÖNCE</h3>
+                <p>Sadece CPU ve Memory kullanımı izleniyor. Bir API yavaşladığında, hangi endpoint'in, hangi thread'in, hangi DB sorgusunun neden olduğu bilinmiyor. Sorun giderme süresi 4-6 saat.</p>
+            </div>
+            <div class="after">
+                <h3>SONRA</h3>
+                <p>Her isteğin trace ID'si, latency dağılımı, DB sorgu süreleri, thread durumları, cache hit/miss oranları izlenebiliyor. Performans sorunu 5 dakika içinde lokalize edilip çözülebiliyor.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-section">
+        <h2>Spring Boot Actuator: Health, Metrics, Thread dump</h2>
+        
+        <div class="highlight">
+            <strong>ÖNEMLİ VURGU:</strong> Spring Boot Actuator, uygulamanızın iç durumunu HTTP endpointleri veya JMX üzerinden dışarıya açar. Production ortamında güvenlik nedeniyle sadece gerekli endpointler açılmalı ve yetkilendirme yapılmalıdır.
+        </div>
+
+        <div class="performance-impact">
+            <strong>PERFORMANS ETKİSİ:</strong> Actuator endpointleri varsayılan olarak hafif performans yükü getirir. Ancak <code>/health</code> endpointi veritabanı, disk, external servis bağlantılarını kontrol edecek şekilde konfigüre edilirse, her health check isteği performansı etkileyebilir. Bu nedenle production'da detaylı sağlık kontrolleri sadece yetkili erişimler için açılmalı.
+        </div>
+
+        <h3>Temel Actuator Endpointleri</h3>
+        <ul>
+            <li><code>/actuator/health</code> - Uygulama sağlık durumu</li>
+            <li><code>/actuator/metrics</code> - JVM ve sistem metrikleri</li>
+            <li><code>/actuator/threaddump</code> - Thread durumları ve deadlock analizi</li>
+            <li><code>/actuator/heapdump</code> - Heap dump almak için</li>
+            <li><code>/actuator/env</code> - Ortam değişkenleri</li>
+        </ul>
+
+        <div class="code-block">
+# application.yml konfigürasyonu
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,threaddump,prometheus
+  endpoint:
+    health:
+      show-details: never # production'da 'never' veya 'when_authorized'
+    threaddump:
+      enabled: true
+  metrics:
+    enable:
+      http:
+        server:
+          requests: true
+</div>
+
+        <div class="before-after">
+            <div class="before">
+                <h3>ÖNCE</h3>
+                <p>Uygulama yavaşladığında, thread'lerin ne yaptığını bilemiyoruz. Thread dump almak için JVM komutları veya server erişimi gerekiyor. Sorun tespiti saatler sürüyor.</p>
+            </div>
+            <div class="after">
+                <h3>SONRA</h3>
+                <p><code>/actuator/threaddump</code> endpointi ile anlık olarak tüm thread'lerin durumu, hangi kodda beklediği, CPU tüketimi görülebiliyor. Deadlock veya thread starvation sorunları dakikalar içinde tespit edilebiliyor.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-section">
+        <h2>Micrometer Metrikleri</h2>
+        
+        <div class="highlight">
+            <strong>ÖNEMLİ VURGU:</strong> Micrometer, Spring Boot 2.0+ ile entegre olan vendor-neutral bir metrik facade'idir. Prometheus, Graphite, Datadog gibi birden fazla monitoring sistemine aynı anda metrik gönderebilir.
+        </div>
+
+        <div class="performance-impact">
+            <strong>PERFORMANS ETKİSİ:</strong> Micrometer, metrik toplama işlemini asenkron ve ring buffer tabanlı yaparak minimum performans etkisiyle çalışır. Ancak çok fazla custom metrik tanımlamak veya çok sık ölçüm almak (örneğin her milisaniyede) performansı etkileyebilir. Önerilen ölçüm aralığı: 1-5 saniye.
+        </div>
+
+        <h3>Temel Micrometer Metrik Tipleri</h3>
+        <ul>
+            <li><strong>Counter:</strong> Artan tek yönlü sayaçlar (örneğin toplam istek sayısı)</li>
+            <li><strong>Gauge:</strong> Anlık değerler (örneğin aktif kullanıcı sayısı, memory kullanımı)</li>
+            <li><strong>Timer:</strong> Süre bazlı ölçümler (örneğin API response time)</li>
+            <li><strong>DistributionSummary:</strong> Dağılım bazlı ölçümler (örneğin response size)</li>
+        </ul>
+
+        <div class="code-block">
+// Custom metrik tanımlama örneği
+@Service
+public class ProductService {
+    
+    private final MeterRegistry meterRegistry;
+    
+    public ProductService(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
+    
+    public Product getProductById(Long id) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        
+        try {
+            Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
+            
+            // İşlem süresini ölç
+            sample.stop(Timer.builder("product.service.get.by.id")
+                .tag("productId", String.valueOf(id))
+                .tag("status", "success")
+                .register(meterRegistry));
+                
+            return product;
+        } catch (Exception e) {
+            sample.stop(Timer.builder("product.service.get.by.id")
+                .tag("productId", String.valueOf(id))
+                .tag("status", "error")
+                .register(meterRegistry));
+            throw e;
+        }
+    }
+}
+</div>
+
+        <div class="before-after">
+            <div class="before">
+                <h3>ÖNCE</h3>
+                <p>Sadece loglarda "Product getirildi" yazıyor. Kaç milisaniye sürdüğü, hangi ID'ler için yavaş çalıştığı, hata oranı bilinmiyor.</p>
+            </div>
+            <div class="after">
+                <h3>SONRA</h3>
+                <p>Her product getirme işleminin süresi, başarılı/hatalı durumu, hangi ID için olduğu Micrometer ile ölçülüyor. Grafana'da 95. percentile response time, error rate, slowest products gibi detaylı analizler yapılıyor.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-section">
+        <h2>Prometheus & Grafana Entegrasyonu</h2>
+        
+        <div class="highlight">
+            <strong>ÖNEMLİ VURGU:</strong> Prometheus, pull-based bir metrik toplama sistemidir. Uygulamanızın <code>/actuator/prometheus</code> endpointinden periyodik olarak metrikleri çeker. Grafana ise bu metrikleri görselleştirmek için kullanılır.
+        </div>
+
+        <div class="performance-impact">
+            <strong>PERFORMANS ETKİSİ:</strong> Prometheus'un metrik çekme sıklığı (scrape interval) çok sık ayarlanırsa (örneğin 1 saniye), yüksek trafikli sistemlerde ekstra yük oluşturabilir. Optimal değer: 15-30 saniye. Ayrıca metriklerin etiket sayısı çok fazla olursa, Prometheus'un depolama ve sorgulama performansı düşer.
+        </div>
+
+        <h3>Entegrasyon Adımları</h3>
+        <ol>
+            <li>Spring Boot projeye Micrometer Prometheus dependency ekle</li>
+            <li>application.yml'de prometheus endpointini aç</li>
+            <li>Prometheus.yml konfigürasyon dosyasında Spring Boot uygulamasını hedef olarak tanımla</li>
+            <li>Grafana'da Prometheus datasource olarak ekle</li>
+            <li>Dashboard oluştur veya Spring Boot için hazır dashboard import et</li>
+        </ol>
+
+        <div class="code-block">
+<!-- pom.xml -->
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
+
+<!-- application.yml -->
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+# prometheus.yml
+scrape_configs:
+  - job_name: 'spring-boot-app'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:8080']
+</div>
+
+        <div class="note">
+            <strong>NOT:</strong> Production ortamında Prometheus'un scrape edebileceği metrik miktarını sınırlamak için aşağıdaki konfigürasyon kullanılabilir:
+            <div class="code-block">
+management:
+  metrics:
+    enable:
+      jvm: true
+      http: true
+      cache: true
+      # Aşağıdaki metrikler çok detaylı olduğu için kapatılabilir
+      # jdbc: false
+      # hibernate: false
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-section">
+        <h2>Alert Mekanizmaları</h2>
+        
+        <div class="highlight">
+            <strong>ÖNEMLİ VURGU:</strong> Alert'ler sadece "sistem down" durumları için değil, performans bozukluklarını erken tespit etmek için de konfigüre edilmelidir. Örneğin 95. percentile response time 2 saniyeyi geçtiğinde alert verilmeli.
+        </div>
+
+        <div class="performance-impact">
+            <strong>PERFORMANS ETKİSİ:</strong> İyi tanımlanmış alert'ler, performans sorunlarının kullanıcı etkilemeden önce tespit edilmesini sağlar. Bu da kullanıcı deneyimini korur ve sistem kaynaklarının verimli kullanımını sağlar. Kötü tanımlanmış alert'ler ise "alert fatigue" yaratır ve gerçek sorunlar gözden kaçabilir.
+        </div>
+
+        <h3>Temel Alert Senaryoları</h3>
+        <ul>
+            <li>HTTP error rate > %5 (5 dakika ortalama)</li>
+            <li>95. percentile response time > 2000ms</li>
+            <li>JVM memory usage > %85</li>
+            <li>CPU usage > %90 (10 dakika süreklilik)</li>
+            <li>Thread count > 500 (anormal artış)</li>
+        </ul>
+
+        <div class="code-block">
+# Alert Rules (Prometheus rules.yml)
+groups:
+- name: spring-boot-alerts
+  rules:
+  - alert: HighRequestLatency
+    expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application="myapp"}[5m])) by (le)) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High request latency (instance {{ $labels.instance }})"
+      description: "95th percentile response time is above 2s for 5 minutes"
+
+  - alert: HighErrorRate
+    expr: sum(rate(http_server_requests_seconds_count{status=~"5..",application="myapp"}[5m])) / sum(rate(http_server_requests_seconds_count{application="myapp"}[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High error rate (instance {{ $labels.instance }})"
+      description: "HTTP error rate is above 5% for 5 minutes"
+</div>
+    </div>
+
+    <div class="slide-section">
+        <h2>💻 Demo Senaryosu: End-to-End Performans İzleme</h2>
+        
+        <div class="demo-step">
+            <h3>Adım 1: /actuator/metrics/http.server.requests ile response time ölçümü</h3>
+            <p>Spring Boot uygulamasını çalıştırın ve aşağıdaki endpointe erişin:</p>
+            <div class="code-block">
+GET http://localhost:8080/actuator/metrics/http.server.requests
+
+# Response örneği:
+{
+  "name": "http.server.requests",
+  "description": "Timer of HTTP server requests",
+  "baseUnit": "seconds",
+  "measurements": [
+    { "statistic": "COUNT", "value": 125 },
+    { "statistic": "TOTAL_TIME", "value": 45.23 },
+    { "statistic": "MAX", "value": 1.45 }
+  ],
+  "availableTags": [
+    { "tag": "exception", "values": ["None"] },
+    { "tag": "method", "values": ["GET", "POST"] },
+    { "tag": "uri", "values": ["/api/products", "/api/users"] },
+    { "tag": "status", "values": ["200", "404"] }
+  ]
+}
+            </div>
+            <p>Her bir URI için ayrı ayrı performans ölçümü yapmak için:</p>
+            <div class="code-block">
+GET http://localhost:8080/actuator/metrics/http.server.requests?tag=uri:/api/products&tag=method:GET
+
+# Bu, sadece GET /api/products isteklerinin metriklerini gösterir
+            </div>
+        </div>
+
+        <div class="demo-step">
+            <h3>Adım 2: Prometheus + Grafana dashboard üzerinden Spring Boot metrikleri izleme</h3>
+            <ol>
+                <li>Prometheus'u Docker ile başlatın:
+                    <div class="code-block">
+docker run -d -p 9090:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+                    </div>
+                </li>
+                <li>Grafana'yı Docker ile başlatın:
+                    <div class="code-block">
+docker run -d -p 3000:3000 grafana/grafana
+                    </div>
+                </li>
+                <li>Grafana'ya giriş yapın (admin/admin) ve Prometheus'u datasource olarak ekleyin</li>
+                <li>Spring Boot için hazır dashboard import edin (ID: 10280 veya 4701)</li>
+                <li>Dashboard'da aşağıdaki metrikleri izleyin:
+                    <ul>
+                        <li>JVM Memory Usage</li>
+                        <li>HTTP Request Rate ve Error Rate</li>
+                        <li>Response Time Percentiles (50, 90, 95, 99)</li>
+                        <li>Thread Count ve CPU Usage</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="demo-step">
+            <h3>Adım 3: JMeter ile load testi yap → Grafana'da gözlemle</h3>
+            <ol>
+                <li>JMeter'i açın ve yeni bir Test Plan oluşturun</li>
+                <li>Thread Group ekleyin:
+                    <ul>
+                        <li>Number of Threads: 100</li>
+                        <li>Ramp-up period: 10 saniye</li>
+                        <li>Loop Count: 100</li>
+                    </ul>
+                </li>
+                <li>HTTP Request ekleyin:
+                    <ul>
+                        <li>Server Name: localhost</li>
+                        <li>Port: 8080</li>
+                        <li>Path: /api/products</li>
+                    </ul>
+                </li>
+                <li>View Results Tree ve Summary Report ekleyin</li>
+                <li>Testi başlatın</li>
+                <li>Aynı anda Grafana dashboardunu açın ve aşağıdaki değişiklikleri gözlemleyin:
+                    <ul>
+                        <li>HTTP Request Rate'ın ani yükselişi</li>
+                        <li>Response Time'ın nasıl değiştiği (özellikle 95. percentile)</li>
+                        <li>JVM Memory Usage'ın artışı ve GC etkinliği</li>
+                        <li>Thread Count'un artışı</li>
+                        <li>Eğer hata olursa Error Rate grafiği</li>
+                    </ul>
+                </li>
+                <li>Test bittikten sonra, sistem yükünün düşmesiyle birlikte metriklerin normale dönüp dönmediğini gözlemleyin</li>
+            </ol>
+            
+            <div class="performance-impact">
+                <strong>PERFORMANS ETKİSİ GÖZLEMİ:</strong> JMeter testi sırasında Grafana'da response time'ın 95. percentile'ının 500ms'den 2500ms'ye çıktığını gözlemlediniz. Bu, sistemin 100 eşzamanlı kullanıcı altında performans bozukluğuna uğradığını gösterir. Thread dump analizi ile thread'lerin database connection pool'da beklediği tespit edildi. Connection pool size artırıldığında, aynı yükte response time 600ms seviyesine düştü.
+            </div>
+        </div>
+
+        <div class="note">
+            <h3>Öğrencilere Pratik Ödev:</h3>
+            <p>Öğrencilerden kendi Spring Boot uygulamalarına aşağıdaki optimizasyonları uygulamalarını isteyin:</p>
+            <ol>
+                <li>Actuator endpointlerini güvenli hale getirin (sadece admin erişebilsin)</li>
+                <li>Özel bir metrik ekleyin (örneğin cache hit ratio)</li>
+                <li>Prometheus ve Grafana kurulumu yapın</li>
+                <li>Basit bir alert kuralı tanımlayın (örneğin error rate > %1)</li>
+                <li>JMeter ile load testi yapın ve performans bozukluğunu Grafana'da gözlemleyin</li>
+                <li>Performansı artırmak için bir optimizasyon yapın (cache ekleme, connection pool artırma vb.) ve etkisini ölçün</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="slide-section">
+        <h2>Özet ve En İyi Uygulamalar</h2>
+        
+        <div class="highlight">
+            <strong>PERFORMANS İÇİN KRİTİK VURGULAR:</strong>
+            <ol>
+                <li>Observability sadece tooling değil, sistem mimarisinin bir parçasıdır. Performans optimizasyonu için ölçülebilir olmak şarttır.</li>
+                <li>Production'da Actuator endpointlerine erişimi kısıtlayın. Sadece gerekli metrikleri toplayın.</li>
+                <li>Metrik etiketlerini dikkatli seçin. Çok fazla kardinalite (örneğin user_id gibi) Prometheus performansını düşürür.</li>
+                <li>Alert'leri anlamlı ve actionable olacak şekilde tanımlayın. "Sistem yavaşladı" değil, "GET /api/products 95. percentile response time 2s'yi aştı" gibi spesifik alertler.</li>
+                <li>Load testlerini düzenli yapın ve performans eğilimlerini takip edin. Bugün çalışan sistem, yarın çökebilir.</li>
+            </ol>
+        </div>
+
+        <div class="performance-impact">
+            <strong>SONUÇ OLARAK PERFORMANS KAZANIMI:</strong> Observability araçları ile donatılmış bir Spring Boot uygulamasında:
+            <ul>
+                <li>Mean Time To Detect (MTTD) %90 azalır</li>
+                <li>Mean Time To Resolution (MTTR) %70 azalır</li>
+                <li>Proaktif optimizasyonlar ile response time %40 iyileştirilebilir</li>
+                <li>Kaynak israfı (CPU, Memory) %30 azaltılabilir</li>
+                <li>Kullanıcı deneyimi (UX) ölçülebilir şekilde iyileştirilir</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

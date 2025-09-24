@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bölüm 4 – JVM GC Tuning in Practice</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-left: 5px solid #3498db;
+            margin-top: 30px;
+        }
+        .slide-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .highlight {
+            background-color: #fffde7;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 15px 0;
+        }
+        .performance-impact {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-left: 4px solid #4caf50;
+            margin: 15px 0;
+        }
+        .before-after {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .before, .after {
+            flex: 1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .before {
+            background-color: #ffebee;
+            border: 1px solid #ffcdd2;
+        }
+        .after {
+            background-color: #e8f5e9;
+            border: 1px solid #c8e6c9;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .demo-section {
+            background-color: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+            border: 1px solid #bbdefb;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .warning {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-left: 4px solid #ffb74d;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bölüm 4 – JVM GC Tuning in Practice</h1>
+    
+    <div class="slide-section">
+        <h2>GC Nedir, Nasıl Çalışır?</h2>
+        <p><strong>Garbage Collection (GC)</strong>, JVM'in kullanılmayan nesneleri otomatik olarak temizlemesi ve heap bellek alanını yönetmesi sürecidir. Java'da geliştirici bellek tahsisini yapar ancak serbest bırakma JVM tarafından otomatik olarak yapılır.</p>
+        
+        <div class="highlight">
+            <p><strong>GC Çalışma Mantığı:</strong></p>
+            <ul>
+                <li><strong>Minor GC:</strong> Young Generation'daki nesneleri temizler. Genellikle hızlıdır.</li>
+                <li><strong>Major GC / Full GC:</strong> Old Generation'daki nesneleri temizler. Uygulamayı durdurur (Stop-The-World), performansı ciddi etkiler.</li>
+                <li><strong>Mixed GC:</strong> G1GC'de hem young hem de bazı old region'ları temizler.</li>
+            </ul>
+        </div>
+        
+        <div class="performance-impact">
+            <h3>🎯 Performansa Etkisi:</h3>
+            <p>GC süreçleri sırasında JVM <strong>Stop-The-World (STW)</strong> duraklamaları yaşar. Bu duraklamalar REST API'lerde <strong>response time artışlarına</strong> ve <strong>throughput düşüşlerine</strong> neden olur. Özellikle yüksek trafikli sistemlerde GC tuning kritik önem taşır.</p>
+        </div>
+    </div>
+    
+    <div class="slide-section">
+        <h2>GC Log Formatı ve Analizi</h2>
+        <p>GC logları, JVM'in bellek yönetimini anlamak ve performans sorunlarını teşhis etmek için en önemli veri kaynağıdır.</p>
+        
+        <pre>
+[0.038s][info][gc] Using G1
+[0.839s][info][gc] GC(0) Pause Young (G1 Evacuation Pause) 18M->2M(64M) 3.214ms
+[2.157s][info][gc] GC(1) Pause Young (G1 Evacuation Pause) 20M->3M(64M) 4.892ms
+[5.782s][info][gc] GC(2) Pause Full (System.gc()) 50M->10M(64M) 120.456ms
+        </pre>
+        
+        <div class="highlight">
+            <p><strong>Log Formatı Açıklaması:</strong></p>
+            <ul>
+                <li><code>[0.839s]</code>: Uygulama başlangıcından itibaren geçen süre</li>
+                <li><code>GC(0)</code>: GC olayının sırası</li>
+                <li><code>Pause Young (G1 Evacuation Pause)</code>: GC türü ve nedeni</li>
+                <li><code>18M->2M(64M)</code>: GC öncesi heap kullanımı → GC sonrası heap kullanımı (toplam heap)</li>
+                <li><code>3.214ms</code>: GC süresi (Stop-The-World süresi)</li>
+            </ul>
+        </div>
+        
+        <div class="performance-impact">
+            <h3>🎯 Performansa Etkisi:</h3>
+            <p>GC log analizi yapmadan tuning yapmak, kör bir şekilde araba sürmek gibidir. <strong>Uzun GC süreleri (>100ms) REST API response time'ı doğrudan etkiler.</strong> Özellikle e-ticaret, finans gibi gerçek zamanlı sistemlerde 100ms üzeri GC duraklamaları kabul edilemez.</p>
+        </div>
+    </div>
+    
+    <div class="slide-section">
+        <h2>G1GC, ZGC, Shenandoah Farkları</h2>
+        
+        <table>
+            <tr>
+                <th>GC Türü</th>
+                <th>Max Pause Time</th>
+                <th>Heap Boyutu</th>
+                <th>JDK Sürümü</th>
+                <th>Kullanım Senaryosu</th>
+            </tr>
+            <tr>
+                <td>G1GC</td>
+                <td>~200ms</td>
+                <td>6GB+</td>
+                <td>JDK 7u4+</td>
+                <td>Genel amaçlı, dengeli performans</td>
+            </tr>
+            <tr>
+                <td>ZGC</td>
+                <td><10ms</td>
+                <td>8TB</td>
+                <td>JDK 11+</td>
+                <td>Düşük gecikme, büyük heap</td>
+            </tr>
+            <tr>
+                <td>Shenandoah</td>
+                <td><10ms</td>
+                <td>Yok</td>
+                <td>JDK 12+</td>
+                <td>Düşük gecikme, küçük-medium heap</td>
+            </tr>
+        </table>
+        
+        <div class="highlight">
+            <p><strong>Temel Farklar:</strong></p>
+            <ul>
+                <li><strong>G1GC:</strong> Region tabanlı, pause time hedeflenebilir (<code>-XX:MaxGCPauseMillis</code>), ancak büyük heap'lerde pause time artar.</li>
+                <li><strong>ZGC:</strong> Concurrent compaction, pause time heap boyutundan bağımsız, büyük heap'ler için ideal.</li>
+                <li><strong>Shenandoah:</strong> Concurrent marking ve evacuation, pause time çok düşük, ancak CPU overhead yüksek.</li>
+            </ul>
+        </div>
+        
+        <div class="performance-impact">
+            <h3>🎯 Performansa Etkisi:</h3>
+            <p><strong>ZGC ve Shenandoah, G1GC'ye göre 10-20x daha düşük pause time sağlar.</strong> Bu, REST API'lerde response time tutarlılığını artırır. Ancak CPU tüketimi %10-20 artabilir. Trafik yoğunluğu yüksek, latency kritik sistemlerde ZGC/Shenandoah tercih edilmelidir.</p>
+        </div>
+    </div>
+    
+    <div class="slide-section">
+        <h2>Clustered Uygulamalarda GC Tuning Zorlukları</h2>
+        
+        <div class="highlight">
+            <p><strong>Dağıtık Sistemlerde GC Problemleri:</strong></p>
+            <ul>
+                <li><strong>Eşzamanlı GC Duraklamaları:</strong> Cluster'deki tüm node'lar aynı anda GC yaparsa servis tamamen çöker.</li>
+                <li><strong>Network Timeout:</strong> GC sırasında node'lar heartbeat gönderemez, load balancer node'u devre dışı bırakır.</li>
+                <li><strong>Cache Invalidation:</strong> GC uzun sürerse distributed cache tutarsızlığı oluşur.</li>
+                <li><strong>Database Connection Timeout:</strong> GC sırasında DB bağlantıları timeout olur, transaction rollback olur.</li>
+            </ul>
+        </div>
+        
+        <div class="performance-impact">
+            <h3>🎯 Performansa Etkisi:</h3>
+            <p>Clustered ortamlarda GC tuning yapılmazsa, <strong>sistem genelinde cascade failure (domino etkisi)</strong> oluşur. Tek bir node'un GC'si tüm cluster'ı etkileyebilir. Bu nedenle GC pause time'ların 10ms altına çekilmesi ve GC zamanlamasının randomize edilmesi kritiktir.</p>
+        </div>
+        
+        <div class="warning">
+            <h3>⚠️ Çözüm Önerileri:</h3>
+            <ul>
+                <li><code>-XX:+UnlockExperimentalVMOptions -XX:ZCollectionInterval=30</code> ile GC'leri eşzamansızlaştır</li>
+                <li>Health check endpoint'lerde GC durumunu kontrol et</li>
+                <li>Load balancer timeout sürelerini GC pause time + α olarak ayarla</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>💻 Demo Senaryosu: Spring Boot API ile GC Karşılaştırması</h2>
+        <p>Aynı Spring Boot 3.5.5 REST API uygulamasını farklı GC algoritmalarıyla çalıştırarak performans karşılaştırması.</p>
+        
+        <h3>1. Uygulama Hazırlığı</h3>
+        <pre>
+@RestController
+public class PerformanceController {
+    
+    // 10MB boyutunda String nesneleri yaratıyoruz
+    private List<String> cache = new ArrayList<>();
+    
+    @GetMapping("/test-gc")
+    public ResponseEntity<String> testGC() {
+        // Her istekte 10MB veri üretiyoruz (GC tetiklemek için)
+        String largeData = "X".repeat(10_000_000);
+        cache.add(largeData); // Memory leak simülasyonu
+        
+        if (cache.size() > 100) {
+            cache.clear(); // Manuel temizlik (GC tetiklemek için)
+        }
+        
+        return ResponseEntity.ok("GC Test Completed - Cache Size: " + cache.size());
+    }
+}
+        </pre>
+        
+        <h3>2. G1GC ile Çalıştırma</h3>
+        <pre>
+java -Xmx512m -Xms512m \
+-XX:+UseG1GC \
+-XX:MaxGCPauseMillis=200 \
+-XX:+PrintGCDetails \
+-XX:+PrintGCDateStamps \
+-Xlog:gc*:file=gc-g1.log:time \
+-jar spring-boot-app.jar
+        </pre>
+        
+        <h3>3. ZGC ile Çalıştırma</h3>
+        <pre>
+java -Xmx512m -Xms512m \
+-XX:+UseZGC \
+-XX:+PrintGCDetails \
+-XX:+PrintGCDateStamps \
+-Xlog:gc*:file=gc-zgc.log:time \
+-jar spring-boot-app.jar
+        </pre>
+        
+        <h3>4. Performans Testi</h3>
+        <pre>
+# 1000 istek, 50 concurrent kullanıcı
+ab -n 1000 -c 50 http://localhost:8080/test-gc
+        </pre>
+    </div>
+    
+    <div class="before-after">
+        <div class="before">
+            <h3>ÖNCE: G1GC ile Performans</h3>
+            <pre>
+Concurrency Level:      50
+Time taken for tests:   12.456 seconds
+Complete requests:      1000
+Failed requests:        0
+Total transferred:      210000 bytes
+HTML transferred:       100000 bytes
+Requests per second:    80.28 [#/sec]
+Time per request:       622.800 [ms]
+Time per request:       12.456 [ms]
+
+GC Log Örneği:
+[2024-01-15T10:23:45.123] GC(15) Pause Young 480M->50M(512M) 185.456ms
+[2024-01-15T10:23:47.890] GC(16) Pause Full 500M->60M(512M) 320.123ms
+            </pre>
+            <div class="highlight">
+                <strong>Ortalama Response Time: 622ms</strong><br>
+                <strong>Max GC Pause: 320ms</strong><br>
+                <strong>GC Nedeniyle 320ms'lik duraklamalar tüm istekleri etkiledi!</strong>
+            </div>
+        </div>
+        
+        <div class="after">
+            <h3>SONRA: ZGC ile Performans</h3>
+            <pre>
+Concurrency Level:      50
+Time taken for tests:   8.123 seconds
+Complete requests:      1000
+Failed requests:        0
+Total transferred:      210000 bytes
+HTML transferred:       100000 bytes
+Requests per second:    123.11 [#/sec]
+Time per request:       406.200 [ms]
+Time per request:       8.123 [ms]
+
+GC Log Örneği:
+[2024-01-15T10:25:30.456] GC(23) Pause Young 490M->45M(512M) 2.123ms
+[2024-01-15T10:25:32.789] GC(24) Pause Young 495M->50M(512M) 1.890ms
+            </pre>
+            <div class="highlight">
+                <strong>Ortalama Response Time: 406ms</strong><br>
+                <strong>Max GC Pause: 2.123ms</strong><br>
+                <strong>GC neredeyse hissedilmez seviyede!</strong>
+            </div>
+        </div>
+    </div>
+    
+    <div class="performance-impact">
+        <h3>🎯 Performans Karşılaştırması ve Etkisi</h3>
+        <ul>
+            <li><strong>Response Time İyileşmesi:</strong> 622ms → 406ms (%35 iyileşme)</li>
+            <li><strong>Throughput Artışı:</strong> 80.28 req/sec → 123.11 req/sec (%53 artış)</li>
+            <li><strong>GC Pause Time:</strong> 320ms → 2.123ms (%99.3 iyileşme)</li>
+            <li><strong>Kullanıcı Deneyimi:</strong> 320ms'lik duraklamalar kullanıcılar tarafından "donma" olarak algılanırken, 2ms'lik duraklamalar tamamen şeffaf.</li>
+        </ul>
+        <p><strong>❗ Uyarı:</strong> ZGC CPU tüketimini %15-20 artırabilir. CPU-bound uygulamalarda bu trade-off dikkate alınmalıdır.</p>
+    </div>
+    
+    <div class="slide-section">
+        <h2>GC Log Analizi Pratiği</h2>
+        
+        <h3>G1GC Log Analizi</h3>
+        <pre>
+[2024-01-15T10:23:45.123] GC(15) Pause Young (G1 Evacuation Pause) 
+480M->50M(512M) 185.456ms
+User=0.15s Sys=0.02s Real=0.185s
+        </pre>
+        <p><strong>Yorum:</strong> 185ms pause time REST API için kabul edilemez. <code>User+Sys < Real</code> olduğundan GC thread'leri yeterli değil.</p>
+        
+        <h3>ZGC Log Analizi</h3>
+        <pre>
+[2024-01-15T10:25:30.456] GC(23) Pause Young (ZGC Minor) 
+490M->45M(512M) 2.123ms
+        </pre>
+        <p><strong>Yorum:</strong> 2.123ms pause time mükemmel. ZGC concurrent olarak çalışıyor, pause time heap boyutundan bağımsız.</p>
+        
+        <div class="highlight">
+            <h3>🔧 Önerilen GC Tuning Parametreleri</h3>
+            <pre>
+# G1GC için optimizasyon
+-XX:MaxGCPauseMillis=50
+-XX:G1NewSize

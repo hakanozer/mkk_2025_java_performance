@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bölüm 6 – Distributed Caching & In-Memory Data Grids</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-left: 5px solid #3498db;
+            margin-top: 30px;
+        }
+        .slide-title {
+            font-weight: bold;
+            color: #e74c3c;
+            font-size: 1.3em;
+        }
+        .important {
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .performance-impact {
+            background-color: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .before-after {
+            display: flex;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .before, .after {
+            flex: 1;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .before {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .after {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 15px 0;
+        }
+        ul, ol {
+            padding-left: 20px;
+        }
+        .demo-step {
+            background-color: #e8f4f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007acc;
+        }
+        .tool-tip {
+            font-style: italic;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Bölüm 6 – Distributed Caching & In-Memory Data Grids</h1>
+
+    <h2 class="slide-title">Cache Çeşitleri: Local vs Distributed</h2>
+
+    <p><strong>Local Cache:</strong> Uygulamanın kendi belleğinde tutulan, sadece o instance’a özel cache katmanıdır. Örnek: Caffeine, Ehcache (local modda).</p>
+
+    <p><strong>Distributed Cache:</strong> Birden fazla uygulama instance’ı arasında paylaşılan, network üzerinden erişilen cache katmanıdır. Örnek: Redis, Hazelcast, Memcached.</p>
+
+    <div class="important">
+        <strong>❗ Vurgu:</strong> Local cache, network gecikmesi olmadığı için çok hızlıdır ama veri tutarlılığı (consistency) ve paylaşılabilirlik açısından sınırlıdır. Distributed cache, ölçeklenebilirlik ve yüksek erişilebilirlik sağlar ama network maliyeti vardır.
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Performans Etkisi:</strong> 
+        <ul>
+            <li><strong>Local Cache:</strong> 1-5 mikrosaniye erişim süresi. GC baskısı olabilir.</li>
+            <li><strong>Distributed Cache:</strong> 0.5-5 milisaniye erişim süresi (network + serialization). GC etkisi az ama network bottleneck olabilir.</li>
+        </ul>
+    </div>
+
+    <div class="before-after">
+        <div class="before">
+            <h3>ÖNCE: Local Cache ile Tek Instance</h3>
+            <p>Her kullanıcı isteği aynı JVM'de cache’lenir. Ölçeklenme yok. Sunucu yeniden başlatıldığında cache silinir.</p>
+            <p><strong>Performans:</strong> Çok hızlı ama tek nokta, tek sunucu bağımlılığı.</p>
+        </div>
+        <div class="after">
+            <h3>SONRA: Distributed Cache ile Multi-Instance</h3>
+            <p>3 adet Spring Boot instance, Redis üzerinden ortak cache paylaşır. Yük dengeleme ile ölçeklenebilir mimari.</p>
+            <p><strong>Performans:</strong> Network gecikmesi eklenir ama sistem çökse bile cache korunur ve diğer instance’lar devam eder.</p>
+        </div>
+    </div>
+
+    <h2 class="slide-title">Redis & Hazelcast Mimarisi</h2>
+
+    <p><strong>Redis:</strong> Anahtar-değer deposu. Tek-threaded, in-memory, disk persistence opsiyonel. Master-Slave replikasyon ve Redis Cluster ile yatay ölçeklenebilir.</p>
+
+    <p><strong>Hazelcast:</strong> In-Memory Data Grid. Java nesnelerini dağıtık şekilde tutar. Peer-to-peer mimari, her node hem client hem server olabilir. Map, Queue, Lock gibi yapıları native destekler.</p>
+
+    <div class="important">
+        <strong>❗ Vurgu:</strong> 
+        <ul>
+            <li>Redis: Basit, hızlı, geniş dil desteği. Veri yapısı sınırlı (string, hash, list, set, sorted set).</li>
+            <li>Hazelcast: Java-native, kompleks nesneleri doğrudan depolayabilir, dağıtık hesaplama ve eventing destekler.</li>
+        </ul>
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Performans Etkisi:</strong> 
+        <ul>
+            <li><strong>Redis:</strong> Network + serialization maliyeti. Basit veri tipleri için optimize.</li>
+            <li><strong>Hazelcast:</strong> Java serileştirme maliyeti yüksek olabilir (özellikle Java Serialization kullanılırsa). Kryo veya Protobuf ile optimize edilebilir.</li>
+        </ul>
+    </div>
+
+    <h2 class="slide-title">Serialization/Deserialization Maliyeti</h2>
+
+    <p>Java nesnelerinin byte dizisine dönüştürülmesi (serialize) ve geri yüklenmesi (deserialize) CPU ve bellek tüketir. Özellikle büyük nesnelerde bu maliyet belirginleşir.</p>
+
+    <div class="important">
+        <strong>❗ Vurgu:</strong> Default Java Serialization yavaş ve ağ trafiği açısından verimsizdir. Performans kritik sistemlerde mutlaka alternatif serializer kullanılmalıdır.
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Performans Etkisi:</strong> 
+        <ul>
+            <li>Java Serialization: 100-500 ms arası büyük nesneler için.</li>
+            <li>Kryo: 10-50 ms arası (10x daha hızlı).</li>
+            <li>Protobuf: 5-30 ms arası + en az ağ trafiği.</li>
+        </ul>
+    </div>
+
+    <div class="before-after">
+        <div class="before">
+            <h3>ÖNCE: Default Java Serialization</h3>
+            <div class="code-block">
+// application.properties
+spring.cache.hazelcast.config=classpath:hazelcast.xml
+
+// Hazelcast config (default serialization)
+<serialization>
+    <serializable-factories/>
+</serialization>
+            </div>
+            <p><strong>Performans:</strong> 10.000 nesne serialize için ~450ms</p>
+        </div>
+        <div class="after">
+            <h3>SONRA: Kryo ile Serialization</h3>
+            <div class="code-block">
+// Hazelcast config with Kryo
+<serialization>
+    <serializers>
+        <serializer type-class="com.example.Product" 
+                    class-name="com.example.KryoSerializer"/>
+    </serializers>
+</serialization>
+
+// KryoSerializer.java
+public class KryoSerializer implements StreamSerializer<Object> {
+    @Override
+    public void write(ObjectDataOutput out, Object obj) throws IOException {
+        Kryo kryo = new Kryo();
+        Output output = new Output((OutputStream) out);
+        kryo.writeClassAndObject(output, obj);
+        output.flush();
+    }
+    // ... read method
+}
+            </div>
+            <p><strong>Performans:</strong> Aynı nesne için ~45ms → <strong>%90 performans artışı!</strong></p>
+        </div>
+    </div>
+
+    <h2 class="slide-title">Eviction Policy & Memory Impact</h2>
+
+    <p>Cache bellek dolunca hangi verilerin atılacağını belirleyen stratejilerdir.</p>
+
+    <ul>
+        <li><strong>LRU (Least Recently Used):</strong> En az kullanılan veriyi atar.</li>
+        <li><strong>LFU (Least Frequently Used):</strong> En az erişilen veriyi atar.</li>
+        <li><strong>MAX_SIZE / MAX_IDLE_TIME:</strong> Boyut veya zaman bazlı eviction.</li>
+    </ul>
+
+    <div class="important">
+        <strong>❗ Vurgu:</strong> Yanlış eviction policy, cache hit ratio’yu düşürür → cache’in faydası yok olur. Bellek baskısı artar, GC sıklığı artar.
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Performans Etkisi:</strong> 
+        <ul>
+            <li>LRU: Genelde en iyi performansı verir (cache hit ratio %70-90).</li>
+            <li>LFU: Uzun vadeli erişim paternlerinde etkili.</li>
+            <li>Yanlış policy: Cache hit ratio %30’a düşebilir → DB sorguları artar → sistem yavaşlar.</li>
+        </ul>
+    </div>
+
+    <h2 class="slide-title">Benchmark Yöntemleri</h2>
+
+    <p>Cache performansını ölçmek için:</p>
+    <ul>
+        <li><strong>Response Time:</strong> Ortalama, median, %95, %99 latency.</li>
+        <li><strong>Throughput:</strong> Saniyedeki istek sayısı (RPS).</li>
+        <li><strong>Cache Hit Ratio:</strong> Cache’ten servis edilen istek / toplam istek.</li>
+        <li><strong>Memory Usage:</strong> Heap ve off-heap bellek tüketimi.</li>
+        <li><strong>GC Overhead:</strong> Garbage Collector süresi ve sıklığı.</li>
+    </ul>
+
+    <div class="important">
+        <strong>❗ Vurgu:</strong> Benchmark sırasında gerçekçi veri seti ve yük paterni kullanın. “Hello World” örneğiyle yapılan benchmark aldatıcıdır.
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Performans Etkisi:</strong> 
+        <p>Doğru benchmark, cache katmanının sisteme katkısını net gösterir. Örneğin: Redis entegrasyonu sonrası ortalama response time 200ms → 45ms’e düşebilir.</p>
+    </div>
+
+    <h2 class="slide-title">💻 Demo Senaryosu: Spring Boot 3.5.5 + IntelliJ IDEA Ultimate</h2>
+
+    <div class="demo-step">
+        <h3>Adım 1: Spring Cache Abstraction ile Redis Entegrasyonu</h3>
+        <div class="code-block">
+// pom.xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-cache</artifactId>
+</dependency>
+
+// application.properties
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.cache.type=redis
+
+// ProductService.java
+@Service
+@CacheConfig(cacheNames = "products")
+public class ProductService {
+    
+    @Cacheable(key = "#id")
+    public Product findById(Long id) {
+        // DB call - expensive operation
+        return productRepository.findById(id).orElse(null);
+    }
+    
+    @CacheEvict(key = "#product.id")
+    public void updateProduct(Product product) {
+        productRepository.save(product);
+    }
+}
+        </div>
+        <p class="tool-tip">💡 IntelliJ IDEA Ultimate: Spring Boot desteği, Redis plugin ile cache içeriğini görsel olarak izleyebilirsiniz.</p>
+    </div>
+
+    <div class="demo-step">
+        <h3>Adım 2: Hazelcast Cluster Kurulumu</h3>
+        <div class="code-block">
+// pom.xml
+<dependency>
+    <groupId>com.hazelcast</groupId>
+    <artifactId>hazelcast-spring</artifactId>
+</dependency>
+
+// hazelcast.yaml (src/main/resources)
+hazelcast:
+  network:
+    join:
+      multicast:
+        enabled: true
+      tcp-ip:
+        enabled: false
+  map:
+    products:
+      time-to-live-seconds: 300
+      max-idle-seconds: 60
+      eviction:
+        size: 10000
+        max-size-policy: PER_NODE
+        eviction-policy: LRU
+
+// Application.java
+@SpringBootApplication
+@EnableCaching
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+    
+    @Bean
+    public Config hazelcastConfig() {
+        Config config = new Config();
+        config.setNetworkConfig(new NetworkConfig().setPort(5701));
+        return config;
+    }
+}
+        </div>
+        <p class="tool-tip">💡 IntelliJ IDEA Ultimate: Docker entegrasyonu ile 3 adet Hazelcast node’u docker-compose ile kolayca ayağa kaldırılabilir.</p>
+    </div>
+
+    <div class="demo-step">
+        <h3>Adım 3: JMeter ile Benchmark → Redis vs Hazelcast Response Time Kıyaslaması</h3>
+        <ol>
+            <li>JMeter’ı açın ve yeni bir “Test Plan” oluşturun.</li>
+            <li>Thread Group: 100 kullanıcı, ramp-up 10 saniye, loop 100.</li>
+            <li>HTTP Request: GET http://localhost:8080/api/products/1</li>
+            <li>Listener: View Results Tree + Summary Report + Aggregate Report ekleyin.</li>
+            <li>Önce Redis cache aktifken testi çalıştırın.</li>
+            <li>Sonra Hazelcast aktifken testi çalıştırın.</li>
+            <li>İki senaryonun “Average Response Time” ve “Throughput” değerlerini karşılaştırın.</li>
+        </ol>
+        <div class="code-block">
+# Örnek JMeter Sonuçları (1000 istek)
+
+REDIS:
+- Average Response Time: 42 ms
+- Throughput: 238.5/sec
+- Error %: 0%
+
+HAZELCAST (Default Serialization):
+- Average Response Time: 89 ms
+- Throughput: 112.3/sec
+- Error %: 0%
+
+HAZELCAST (Kryo Serialization):
+- Average Response Time: 38 ms
+- Throughput: 263.1/sec
+- Error %: 0%
+        </div>
+        <p class="tool-tip">💡 IntelliJ IDEA Ultimate: JMeter entegrasyonu ile doğrudan IDE içinden test senaryoları çalıştırılabilir ve sonuçlar grafiksel olarak analiz edilebilir.</p>
+    </div>
+
+    <div class="important">
+        <strong>❗ Sonuç Vurgusu:</strong> 
+        <p>Serialization stratejisi, distributed cache performansında kritik rol oynar. Kryo kullanımı ile Hazelcast, Redis’i geçebilir. Ancak Redis daha basit, stabil ve düşük latency garantisi verir. Seçim, veri yapısı ve kullanım senaryosuna göre yapılmalıdır.</p>
+    </div>
+
+    <div class="performance-impact">
+        <strong>⚡ Genel Performans Kazanımı:</strong> 
+        <p>Doğru cache stratejisi + doğru serialization + doğru eviction policy ile:</p>
+        <ul>
+            <li>Response time: 200ms → 40ms (%80 iyileşme)</li>
+            <li>DB yükü: %70 azalma</li>
+            <li>GC süresi: %40 azalma (cache hit ratio artışı sayesinde)</li>
+            <li>Scale-out maliyeti: %50 azalma (daha az instance ile aynı performans)</li>
+        </ul>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Optimized Java Development - Java & Spring Boot Code Optimization Tips</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-left: 5px solid #3498db;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #e74c3c;
+        }
+        .slide-title {
+            background-color: #3498db;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 25px 0 20px 0;
+            font-size: 1.4em;
+        }
+        .highlight {
+            background-color: #fffde7;
+            padding: 15px;
+            border-left: 4px solid #ffd600;
+            margin: 15px 0;
+        }
+        .performance-tip {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-left: 4px solid #4caf50;
+            margin: 15px 0;
+        }
+        .before-after {
+            display: flex;
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .before, .after {
+            flex: 1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .before {
+            background-color: #ffebee;
+            border: 1px solid #ffcdd2;
+        }
+        .after {
+            background-color: #e8f5e9;
+            border: 1px solid #c8e6c9;
+        }
+        .before h4, .after h4 {
+            margin-top: 0;
+            color: #d32f2f;
+        }
+        .after h4 {
+            color: #388e3c;
+        }
+        code {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+        pre {
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .demo-section {
+            background-color: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border: 2px dashed #2196f3;
+        }
+        .note {
+            background-color: #fff3e0;
+            padding: 15px;
+            border-left: 4px solid #ffb74d;
+            margin: 15px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Performance Optimized Java Development</h1>
+<h2>8 – Java & Spring Boot Code Optimization Tips</h2>
+
+<div class="slide-title">📑 Java Core Optimizasyonlar</div>
+
+<h3>String Concatenation</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Geleneksel "+" operatörü ile string birleştirme, her birleştirme işleminde yeni String nesnesi oluşturur. Büyük veri setlerinde bu, gereksiz bellek tüketimi ve GC (Garbage Collection) baskısı yaratır.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük)</h4>
+        <pre><code>public String buildReport(List<String> items) {
+    String result = "";
+    for (String item : items) {
+        result += item + "\n"; // Her döngüde yeni String nesnesi!
+    }
+    return result;
+}</code></pre>
+        <p><strong>GC Etkisi:</strong> 10.000 eleman için ~10.000 geçici String nesnesi</p>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek)</h4>
+        <pre><code>public String buildReport(List<String> items) {
+    StringBuilder sb = new StringBuilder();
+    for (String item : items) {
+        sb.append(item).append("\n");
+    }
+    return sb.toString();
+}</code></pre>
+        <p><strong>GC Etkisi:</strong> Sadece 1 StringBuilder + 1 sonuç String nesnesi</p>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> 10.000+ iterasyonlarda StringBuilder, "+" operatörüne göre 100x-300x daha hızlı çalışabilir. GC baskısı neredeyse sıfıra iner.
+</div>
+
+<h3>Primitive vs Wrapper</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Wrapper sınıflar (Integer, Long vs.) boxing/unboxing maliyeti getirir. Özellikle yoğun döngülerde bu maliyet kritik olur.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük)</h4>
+        <pre><code>public void processNumbers(List<Integer> numbers) {
+    Integer sum = 0; // Boxing
+    for (Integer num : numbers) {
+        sum = sum + num; // Unboxing + Boxing
+    }
+}</code></pre>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek)</h4>
+        <pre><code>public void processNumbers(int[] numbers) {
+    int sum = 0; // Primitive - zero overhead
+    for (int num : numbers) {
+        sum += num;
+    }
+}</code></pre>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> Primitive tipler, Wrapper'lara göre 2-5x daha hızlıdır. Ayrıca memory footprint %50-70 daha düşüktür.
+</div>
+
+<h3>BigDecimal Kullanımı</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> BigDecimal, hassas hesaplamalar için gerekli olsa da, double'a göre 10-100x daha yavaştır. Gereksiz kullanım performansı ciddi şekilde etkiler.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük)</h4>
+        <pre><code>// Para birimi olmayan hesaplamalarda BigDecimal kullanımı
+BigDecimal total = BigDecimal.ZERO;
+for (Product p : products) {
+    total = total.add(new BigDecimal(p.getPrice())); // Aşırı maliyetli
+}</code></pre>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek)</h4>
+        <pre><code>// Hassasiyet gerekmiyorsa double kullan
+double total = 0.0;
+for (Product p : products) {
+    total += p.getPrice(); // CPU native işlem
+}
+
+// Para birimi içinse cent cinsinden long kullan
+long totalCents = 0;
+for (Product p : products) {
+    totalCents += Math.round(p.getPrice() * 100); // Long aritmetiği
+}</code></pre>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> BigDecimal, finansal işlemler dışında kullanılmamalı. Basit aritmetik işlemlerde double veya long kullanımı 50x performans artışı sağlar.
+</div>
+
+<h3>Gereksiz Object Creation</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Her istekte yeni nesne oluşturmak, GC'yi tetikler ve CPU zamanını tüketir. Özellikle yüksek trafikli sistemlerde kritik darboğaz yaratır.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük)</h4>
+        <pre><code>@Service
+public class ReportService {
+    public String generateReport() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd"); // Her çağrıda yeni nesne!
+        return sdf.format(new Date());
+    }
+}</code></pre>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek)</h4>
+        <pre><code>@Service
+public class ReportService {
+    private static final DateTimeFormatter FORMATTER = 
+        DateTimeFormatter.ofPattern("yyyy-MM-dd"); // Tek seferde oluşturulur
+
+    public String generateReport() {
+        return LocalDate.now().format(FORMATTER);
+    }
+}</code></pre>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> Thread-safe immutable nesneleri static final olarak tanımlamak, nesne oluşturma maliyetini %100 azaltır ve GC baskısını ortadan kaldırır.
+</div>
+
+<div class="slide-title">📑 Spring Boot API Optimizasyonlar</div>
+
+<h3>N+1 Problem Çözümü (Spring Data JPA + Fetch Join)</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> N+1 problemi, 1 ana sorgu + N alt sorgu anlamına gelir. 100 kayıt için 101 veritabanı sorgusu! Bu, ağ gecikmesi ve DB yükü açısından felakettir.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük - N+1)</h4>
+        <pre><code>@Entity
+public class Order {
+    @Id private Long id;
+    @OneToMany(mappedBy = "order")
+    private List<OrderItem> items; // LAZY loaded
+}
+
+// Controller
+@GetMapping("/orders")
+public List<Order> getOrders() {
+    return orderRepository.findAll(); // 1 sorgu
+}
+
+// JSON serialization sırasında her Order için items lazy load edilir → N sorgu!
+</code></pre>
+        <p><strong>DB Sorguları:</strong> 1 (Order) + N (OrderItem) = N+1</p>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek - Fetch Join)</h4>
+        <pre><code>@Repository
+public interface OrderRepository extends JpaRepository<Order, Long> {
+    @Query("SELECT DISTINCT o FROM Order o JOIN FETCH o.items")
+    List<Order> findAllWithItems(); // Tek sorguda hepsi
+}
+
+// Veya EntityGraph ile
+@NamedEntityGraph(name = "Order.withItems", 
+    attributeNodes = @NamedAttributeNode("items"))
+public class Order { ... }
+
+// Repository
+@EntityGraph("Order.withItems")
+List<Order> findAll();
+</code></pre>
+        <p><strong>DB Sorguları:</strong> 1 (JOIN ile tek sorgu)</p>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> 100 kayıt için N+1 problemi 101 sorgu → 1 sorguya indirilir. Ortalama yanıt süresi 500ms'den 50ms'ye düşer (%90 iyileşme).
+</div>
+
+<h3>DTO Mapping Optimizasyonu (MapStruct vs ModelMapper)</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Reflection tabanlı mapper'lar (ModelMapper) çalışma zamanında reflection kullanır. Derleme zamanında kod üreten mapper'lar (MapStruct) native Java kodu üretir.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük - ModelMapper)</h4>
+        <pre><code>@Service
+public class ProductService {
+    private ModelMapper modelMapper = new ModelMapper();
+    
+    public ProductDTO toDTO(Product product) {
+        return modelMapper.map(product, ProductDTO.class); // Runtime reflection!
+    }
+}</code></pre>
+        <p><strong>Performans:</strong> ~10.000 mapping/sn, yüksek CPU kullanımı</p>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek - MapStruct)</h4>
+        <pre><code>@Mapper(componentModel = "spring")
+public interface ProductMapper {
+    ProductMapper INSTANCE = Mappers.getMapper(ProductMapper.class);
+    
+    ProductDTO toDTO(Product product); // Compile-time generated code
+}
+
+// Üretilen kod (derleme zamanında):
+// public class ProductMapperImpl implements ProductMapper {
+//     public ProductDTO toDTO(Product product) {
+//         if (product == null) return null;
+//         ProductDTO dto = new ProductDTO();
+//         dto.setId(product.getId()); // Direct field access - zero reflection
+//         dto.setName(product.getName());
+//         return dto;
+//     }
+// }</code></pre>
+        <p><strong>Performans:</strong> ~1.500.000 mapping/sn, düşük CPU kullanımı</p>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> MapStruct, ModelMapper'a göre 50-150x daha hızlıdır. Reflection maliyeti ortadan kalkar, CPU cache locality iyileşir.
+</div>
+
+<h3>Logging Best Practices (Async Logging)</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Senkron loglama, disk I/O bekleme süresince thread'leri bloke eder. Async loglama, logları ayrı bir thread'de işler ve ana thread'leri serbest bırakır.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük - Senkron)</h4>
+        <pre><code># logback-spring.xml (default - synchronous)
+<appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>app.log</file>
+    <encoder>
+        <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+</appender>
+
+// Her log çağrısı disk I/O bekler!
+logger.info("User {} logged in", userId);</code></pre>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek - Async)</h4>
+        <pre><code># logback-spring.xml (async)
+<appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+    <appender-ref ref="FILE"/>
+    <queueSize>512</queueSize>
+    <discardingThreshold>0</discardingThreshold>
+    <includeCallerData>false</includeCallerData>
+</appender>
+
+# application.properties
+logging.pattern.console=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+
+// Log çağrısı hemen dönüyor, I/O async thread'de yapılıyor</code></pre>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> Async logging, yüksek trafikli sistemlerde request sürelerini %30-70 azaltabilir. Thread'ler I/O beklemek yerine iş yapmaya devam eder.
+</div>
+
+<h3>PreparedStatement Kullanımı</h3>
+<div class="highlight">
+    <strong>Performansa Etkisi:</strong> Statement yerine PreparedStatement kullanımı, SQL injection koruması sağlamanın yanı sıra, DB'nin sorgu planını önbelleğe almasına izin verir.
+</div>
+
+<div class="before-after">
+    <div class="before">
+        <h4>ÖNCE (Performans Düşük - Statement)</h4>
+        <pre><code>String sql = "SELECT * FROM users WHERE name = '" + name + "'"; // SQL Injection riski!
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sql); // Her seferde yeni parse + plan</code></pre>
+        <p><strong>DB Yükü:</strong> Her sorgu için yeni parse ve execution plan</p>
+    </div>
+    <div class="after">
+        <h4>SONRA (Performans Yüksek - PreparedStatement)</h4>
+        <pre><code>String sql = "SELECT * FROM users WHERE name = ?";
+PreparedStatement pstmt = connection.prepareStatement(sql);
+pstmt.setString(1, name);
+ResultSet rs = pstmt.executeQuery(); // Sorgu planı önbelleğe alınır</code></pre>
+        <p><strong>DB Yükü:</strong> İlk çalıştırmada parse + plan, sonrakilerde sadece execute</p>
+    </div>
+</div>
+
+<div class="performance-tip">
+    <strong>📌 Performans Vurgusu:</strong> PreparedStatement, aynı sorgunun tekrar tekrar çalıştırılması durumunda %40-60 performans artışı sağlar. DB CPU ve memory kullanımı düşer.
+</div>
+
+<div class="demo-section">
+    <h2>💻 Demo Senaryosu: Optimize Edilmemiş vs Optimize Edilmiş REST API</h2>
+    
+    <h3>JMeter Load Test ile Kıyaslamalar</h3>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Metrik</th>
+                <th>Optimize Edilmemiş API</th>
+                <th>Optimize Edilmiş API</th>
+                <th>İyileşme</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Ortalama Yanıt Süresi</td>
+                <td>850 ms</td>
+                <td>95 ms</td>
+                <td>%89 daha hızlı</td>
+            </tr>
+            <tr>
+                <td>İstek/Saniye (Throughput)</td>
+                <td>120 req/sec</td>
+                <td>1,150 req/sec</td>
+                <td>%858 artış</td>
+            </tr>
+            <tr>
+                <td>GC Süresi (1 dk)</td>
+                <td>4.2 saniye</td>
+                <td>0.3 saniye</td>
+                <td>%93 azalma</td>
+            </tr>
+            <tr>
+                <td>DB Sorgu Sayısı</td>
+                <td>101 sorgu (N+1)</td>
+                <td>1 sorgu (Fetch Join)</td>
+                <td>%99 azalma</td>
+            </tr>
+            <tr>
+                <td>CPU Kullanımı</td>
+                <td>85%</td>
+                <td>35%</td>
+                <td>%59 azalma</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <h3>Spring Data JPA N+1 Problem Örneği + Çözüm Gösterimi</h3>
+    
+    <div class="note">
+        <strong>Adım 1:</strong> N+1 problemi teşhis etmek için Hibernate loglarını açın:
+        <pre><code>logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE</code></pre>
+    </div>
+    
+    <div class="note">
+        <strong>Adım 2:</strong> N+1 problemi yaşayan kodu gözlemleyin (Yukarıdaki "ÖNCE" örneği)
+    </div>
+    
+    <div class="note">
+        <strong>Adım 3:</strong> Fetch Join çözümünü uygulayın (Yukarıdaki "SONRA" örneği)
+    </div>
+    
+    <div class="note">
+        <strong>Adım 4:</strong> JMeter ile karşılaştırmalı test yapın:
+        <ul>
+            <li>Thread Sayısı: 100</li>
+            <li>Ramp-Up: 10 saniye</li>
+            <li>Loop Count: 100</li>
+            <li>Toplam İstek: 10.000</li>
+        </ul>
+    </div>
+    
+    <div class="performance-tip">
+        <strong>📌 Demo Vurgusu:</strong> N+1 problemini çözmek tek başına, sistemin toplam performansını 8-10x artırabilir. Bu, en büyük kazanımlardan biridir!
+    </div>
+</div>
+
+<div class="highlight">
+    <h3>EĞİTMEN NOTU ÖĞRENCİLERE:</h3>
+    <p>Performans optimizasyonu, "premature optimization" olmamalı. Önce profiling yapın, darboğazları tespit edin, sonra optimize edin. Yukarıdaki tekniklerin her biri, doğru kullanıldığında sisteminizi katlanarak daha performanslı hale getirecektir. Unutmayın: "Measure twice, cut once!"</p>
+</div>
+
+</body>
+</html>

@@ -2,17 +2,21 @@ package com.example.services;
 
 import com.example.entities.Customer;
 import com.example.repositories.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.apache.catalina.User;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
+    final HttpServletRequest req;
     final private List<Map<String, Object>> list;
     final private UserRepository userRepository;
     String name = "";
@@ -70,6 +74,17 @@ public class UserService {
             users.add(user);
         }
         return users;
+    }
+
+    public Customer login(String username, String password) {
+        Optional<Customer> optionalCustomer = userRepository.findByUsernameEqualsAndPasswordEquals(username, password);
+        if (optionalCustomer.isPresent()) {
+            Customer user = optionalCustomer.get();
+            req.getSession().setAttribute("user", user);
+            return user;
+        }else {
+            return null;
+        }
     }
 
 

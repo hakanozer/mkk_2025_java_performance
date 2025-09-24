@@ -27,3 +27,16 @@ public class AppBeans {
     }
 
 }
+
+/*
+docker-compose up --build -d
+Spring Boot health:
+👉 http://localhost:8090/actuator/health
+
+Prometheus:
+👉 http://localhost:9090
+
+Grafana:
+👉 http://localhost:3000
+ (default login: admin/admin)
+ */

@@ -23,7 +23,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./src/main/resources/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /Users/hakan/Documents/GitHub/mkk_2025_java_performance/src/main/resources/prometheus.yml:/etc/prometheus/prometheus.yml
 
   grafana:
     image: grafana/grafana

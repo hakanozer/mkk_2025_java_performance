@@ -29,4 +29,10 @@ public class UserRestController {
         return user;
     }
 
+    // user login
+    @PostMapping("login")
+    public Customer login(@RequestBody Customer user) {
+        return userService.login(user.getUsername(), user.getPassword());
+    }
+
 }

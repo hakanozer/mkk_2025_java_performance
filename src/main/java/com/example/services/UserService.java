@@ -1,6 +1,9 @@
 package com.example.services;
 
 import com.example.entities.Customer;
+import com.example.entities.Product;
+import com.example.entities.ProductRepository;
+import com.example.projections.ProCat;
 import com.example.repositories.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UserService {
 
+    final ProductRepository productRepository;
     final HttpServletRequest req;
     final private List<Map<String, Object>> list;
     final private UserRepository userRepository;
@@ -87,5 +91,14 @@ public class UserService {
         }
     }
 
+
+    public List<Product> allProducts() {
+        return productRepository.allPro();
+    }
+
+
+    public List<ProCat> allProCats() {
+        return productRepository.proCats();
+    }
 
 }

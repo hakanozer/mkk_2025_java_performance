@@ -4,6 +4,7 @@ import com.example.entities.Book;
 import com.example.repositories.BookRepository;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -25,10 +26,16 @@ public class BookService {
         return repository.findById(id).orElse(null);
     }
 
+
     @CacheEvict(value = "books", key = "#result.id", condition = "#result != null")
-    public Book save(Book book) {
-        return repository.save(book);
+    @Async
+    public void save(Book book) {
+        try {
+            Thread.sleep(500);
+        }catch (Exception e){}
+        repository.save(book);
     }
+
 
     @CacheEvict(value = "books", key = "#id")
     public void delete(Long id) {
